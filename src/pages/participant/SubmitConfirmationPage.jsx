@@ -25,15 +25,14 @@ export default function SubmitConfirmationPage() {
     navigate(`/participant/result/${quizId}`);
   };
 
-  const handleEditAnswer = (questionIndex) => {
-    navigate(`/participant/attempt/${quizId}`, {
-      state: {
-        initialQuestionIndex: questionIndex,
-        initialAnswers: state.answers,
-        startTimeOffset: state.timeElapsed // resume timer
-      }
-    });
-  };
+  // const handleGoBack = () => {
+    // navigate(`/participant/quiz-attempt/${quizId}`, {
+      // state: {
+        // initialAnswers: state.answers,
+        // startTimeOffset: state.timeElapsed
+      // }
+    // });
+  // };
 
   if (!quiz) {
     return (
@@ -52,7 +51,7 @@ export default function SubmitConfirmationPage() {
         </h1>
         <p className="text-center text-gray-600 mb-8">
           Double-check your responses before submitting.  
-          You can edit any question if needed.
+          You can go back to make changes if needed.
         </p>
 
         {/* Questions Review */}
@@ -81,12 +80,6 @@ export default function SubmitConfirmationPage() {
                     ? `Your answer: ${userAnswer}`
                     : "Not answered"}
                 </p>
-                <button
-                  onClick={() => handleEditAnswer(index)}
-                  className="px-4 py-1.5 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 transition"
-                >
-                  Edit Answer
-                </button>
               </div>
             );
           })}
@@ -94,12 +87,6 @@ export default function SubmitConfirmationPage() {
 
         {/* Action Buttons */}
         <div className="mt-8 flex flex-col sm:flex-row justify-center gap-4">
-          <button
-            onClick={() => navigate(-1)}
-            className="px-6 py-2 bg-gray-300 text-gray-800 rounded-lg font-semibold hover:bg-gray-400 transition"
-          >
-            Go Back
-          </button>
           <button
             onClick={handleSubmit}
             className="px-6 py-2 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition"

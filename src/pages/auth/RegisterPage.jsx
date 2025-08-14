@@ -44,14 +44,16 @@ export default function RegisterPage() {
       await setDoc(doc(db, "users", userCred.user.uid), {
         email: formData.email,
         role: formData.role,
-        createdAt: new Date()
+        createdAt: new Date(),
+        verified : false,
+        admin:false
       });
 
       // Redirect based on role
       if (formData.role === "organiser") {
-        navigate("/organiser-dashboard");
+        navigate("/organiser/dashboard");
       } else {
-        navigate("/active-quizzes");
+        navigate("/participant/active-quizzes");
       }
     } catch (err) {
       setError(err.message);
@@ -71,7 +73,7 @@ export default function RegisterPage() {
         createdAt: new Date()
       });
 
-      navigate("/active-quizzes");
+      navigate("/participant/active-quizzes");
     } catch (err) {
       setError(err.message);
     }
@@ -113,7 +115,7 @@ export default function RegisterPage() {
             <input
               type="password"
               name="password"
-              placeholder="••••••••"
+              placeholder="password"
               value={formData.password}
               onChange={handleChange}
               required
@@ -128,7 +130,7 @@ export default function RegisterPage() {
             <input
               type="password"
               name="confirmPassword"
-              placeholder="••••••••"
+              placeholder="password"
               value={formData.confirmPassword}
               onChange={handleChange}
               required

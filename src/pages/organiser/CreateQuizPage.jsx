@@ -1,16 +1,44 @@
-import { useState } from "react";
-import { addDoc, collection, serverTimestamp } from "firebase/firestore";
-import { db } from "../../firebase/firebaseConfig";
+// src/pages/organiser/CreateQuizPage.jsx
+import { useState, useEffect } from "react";
+import { addDoc, collection, serverTimestamp, doc, getDoc } from "firebase/firestore";
+import { db, auth } from "../../firebase/firebaseConfig";
 import { useNavigate } from "react-router-dom";
 
 export default function CreateQuizPage() {
   const [title, setTitle] = useState("");
   const [guidelines, setGuidelines] = useState("");
+  const [verified, setVerified] = useState(false);
+  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+
+  // Fetch current user data to check verification
+  const fetchUserData = async () => {
+    try {
+      if (!auth.currentUser) return;
+      const userRef = doc(db, "users", auth.currentUser.uid);
+      const userSnap = await getDoc(userRef);
+      if (userSnap.exists()) {
+        setVerified(userSnap.data().verified || false);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchUserData();
+  }, []);
 
   const handleCreate = async () => {
     if (!title.trim()) {
       alert("Quiz title is required!");
+      return;
+    }
+
+    if (!verified) {
+      alert("You are not verified to create quizzes!");
       return;
     }
 
@@ -20,12 +48,16 @@ export default function CreateQuizPage() {
         guidelines: guidelines.trim(),
         active: false,
         createdAt: serverTimestamp(),
+        organiserId: auth.currentUser.uid, // store organiser ID
       });
       navigate(`/organiser/add-question/${docRef.id}`);
     } catch (error) {
       console.error("Error creating quiz:", error);
+      alert("Failed to create quiz");
     }
   };
+
+  if (loading) return <p className="text-center mt-10">Loading...</p>;
 
   return (
     <div className="flex justify-center items-center min-h-screen bg-gray-50 p-6">
@@ -60,11 +92,22 @@ export default function CreateQuizPage() {
           </button>
           <button
             onClick={handleCreate}
-            className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 rounded-lg transition"
+            disabled={!verified}
+            className={`flex-1 px-4 py-3 rounded-lg transition font-medium ${
+              verified
+                ? "bg-blue-600 hover:bg-blue-700 text-white"
+                : "bg-gray-300 text-gray-500 cursor-not-allowed"
+            }`}
           >
             Save & Add Questions →
           </button>
         </div>
+
+        {!verified && (
+          <p className="text-red-600 mt-4 text-sm">
+            You must be verified by admin to create quizzes.
+          </p>
+        )}
       </div>
     </div>
   );

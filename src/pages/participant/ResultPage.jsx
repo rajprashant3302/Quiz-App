@@ -8,6 +8,7 @@ export default function ResultPage() {
   const { quizId } = useParams();
   const navigate = useNavigate();
   const [result, setResult] = useState(null);
+  const [fullScore, setFullScore] = useState(0); // total possible score
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -19,13 +20,21 @@ export default function ResultPage() {
           setLoading(false);
           return;
         }
+
+        // Fetch quiz attempt
         const docRef = doc(db, "quizAttempts", `${quizId}_${uid}`);
         const docSnap = await getDoc(docRef);
 
         if (docSnap.exists()) {
-          setResult(docSnap.data());
+          const data = docSnap.data();
+          setResult(data);
+
+          // Full score = total questions
+          const totalQuestions = data.answers ? Object.keys(data.answers).length : 0;
+          setFullScore(totalQuestions*4);
         } else {
           setResult({});
+          setFullScore(0);
         }
       } catch (err) {
         console.error("Error fetching result:", err);
@@ -65,7 +74,9 @@ export default function ResultPage() {
         <div className="flex flex-col sm:flex-row justify-center items-center gap-4 mb-8">
           <div className="px-6 py-3 bg-green-100 text-green-800 rounded-lg font-semibold">
             Score:{" "}
-            {result.score !== undefined ? result.score : "Pending evaluation"}
+            {result.score !== undefined
+              ? `${result.score} / ${fullScore}`
+              : "Pending evaluation"}
           </div>
           <div className="px-6 py-3 bg-indigo-100 text-indigo-800 rounded-lg font-semibold">
             Time Taken:{" "}
