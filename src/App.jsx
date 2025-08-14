@@ -22,6 +22,7 @@ import QuizAttemptPage from "./pages/participant/QuizAttemptPage";
 import SubmitConfirmationPage from "./pages/participant/SubmitConfirmationPage";
 import ResultPage from "./pages/participant/ResultPage";
 import LeaderboardPage from "./pages/participant/LeaderboardPage";
+import AdminPage from "./pages/organiser/AdminPage";
 
 function App() {
   return (
@@ -53,7 +54,7 @@ function App() {
       />
       <Route
         path="/organiser/questions/:quizId/:questionId"
-        element={<PrivateRoute allowedRole="organiser"><EditQuestionPage/></PrivateRoute>}
+        element={<PrivateRoute allowedRole="organiser"><EditQuestionPage /></PrivateRoute>}
       />
       <Route
         path="organiser/quiz/:quizId/user/:userId/answers"
@@ -62,6 +63,12 @@ function App() {
       <Route
         path="/organiser/leaderboard/:quizId"
         element={<PrivateRoute allowedRole="organiser"><OrganiserLeaderboardPage /></PrivateRoute>}
+      />
+
+      {/* admin routes */}
+      <Route
+        path="/admin"
+        element={<PrivateRoute allowedRole="organiser"><AdminPage /></PrivateRoute>}
       />
 
       {/* Participant Routes */}

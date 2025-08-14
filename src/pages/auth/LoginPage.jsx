@@ -52,12 +52,6 @@ export default function LoginPage() {
     try {
       const result = await signInWithGoogle();
       let role = await getUserRole(result.user.uid);
-      if (!formData.role) {
-        return setError("Select Role !");
-      }
-      if (formData.role && role !== formData.role) {
-        return setError("Invalid credentials!");
-      }
       localStorage.setItem("user", JSON.stringify({ ...result.user, role }));
       redirectBasedOnRole(role);
     } catch (err) {
