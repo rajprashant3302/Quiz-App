@@ -63,7 +63,7 @@ export default function QuizReview() {
       <div className="bg-indigo-600 text-white rounded-lg p-4 shadow mb-6">
         <h1 className="text-2xl font-bold">{quizTitle}</h1>
         <div className="flex flex-wrap gap-4 mt-2 text-lg">
-          <p><span className="font-semibold">Score:</span> {score} / {questions.length}</p>
+          <p><span className="font-semibold">Score:</span> {score} / {4*questions.length}</p>
           <p><span className="font-semibold">Time Taken:</span> {timeTaken}s</p>
         </div>
       </div>
