@@ -152,7 +152,7 @@ export default function AdminPage() {
       </div>
 
       {/* All Users */}
-      <div className="mb-8">
+      <div className="mb-8 max-h-screen overflow-scroll">
         <h2 className="text-xl font-semibold text-gray-700 mb-4">All Users</h2>
         {users.length === 0 ? (
           <p className="text-gray-500">No users found.</p>

@@ -11,12 +11,33 @@ export default function GuidelinesPage() {
 
   useEffect(() => {
     const fetchQuiz = async () => {
-      const quizRef = doc(db, "quizzes", quizId);
-      const snap = await getDoc(quizRef);
-      if (snap.exists()) setQuiz({ id: snap.id, ...snap.data() });
+      try {
+        // First check in the open quizzes collection
+        let quizRef = doc(db, "quizzes", quizId);
+        let snap = await getDoc(quizRef);
+
+        if (!snap.exists()) {
+          // If not found, check in link-only quizzes
+          quizRef = doc(db, "quizzes_links", quizId);
+          snap = await getDoc(quizRef);
+
+          if (!snap.exists()) {
+            alert("Quiz not found!");
+            navigate("/participant/active-quizzes");
+            return;
+          }
+        }
+
+        setQuiz({ id: snap.id, ...snap.data() });
+      } catch (err) {
+        console.error(err);
+        alert("Failed to fetch quiz data!");
+        navigate("/participant/active-quizzes");
+      }
     };
+
     fetchQuiz();
-  }, [quizId]);
+  }, [quizId, navigate]);
 
   if (!quiz)
     return (

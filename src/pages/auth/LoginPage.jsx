@@ -1,24 +1,38 @@
-// src/pages/auth/LoginPage.jsx
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { loginWithEmail, signInWithGoogle, getUserRole } from "../../firebase/auth";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { FaGoogle } from "react-icons/fa";
 
 export default function LoginPage() {
-  const [formData, setFormData] = useState({ email: "", password: "", role: "" });
+  const [formData, setFormData] = useState({ email: "", password: "" });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // On mount, store quizId from URL if exists
+  useEffect(() => {
+    const pathParts = location.pathname.split("/"); // ["", "quiz", "4xlFUEEmZCNr8vTv3B5E"]
+    const quizIdFromPath = pathParts[2] || null;
+    if (quizIdFromPath) {
+      sessionStorage.setItem("quizIdFromLink", quizIdFromPath);
+    }
+  }, [location.pathname]);
 
   const handleChange = (e) => {
-    setFormData((prev) => ({
-      ...prev,
-      [e.target.name]: e.target.value
-    }));
+    setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
-  const redirectBasedOnRole = (role) => {
-    if (role === "organiser") {
+  const redirectAfterLogin = async (uid) => {
+    const role = await getUserRole(uid);
+    localStorage.setItem("user", JSON.stringify({ uid, role }));
+
+    const quizId = sessionStorage.getItem("quizIdFromLink");
+
+    if (quizId && role === "user") {
+      sessionStorage.removeItem("quizIdFromLink");
+      navigate(`/participant/guidelines/${quizId}`);
+    } else if (role === "organiser") {
       navigate("/organiser/dashboard");
     } else {
       navigate("/participant/active-quizzes");
@@ -31,15 +45,7 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const result = await loginWithEmail(formData.email, formData.password);
-      if (!formData.role) {
-        return setError("Select a Role !");
-      }
-      let role = await getUserRole(result.user.uid);
-      if (role !== formData.role) {
-        return setError("Invalid credentials!");
-      }
-      localStorage.setItem("user", JSON.stringify({ ...result.user, role }));
-      redirectBasedOnRole(role);
+      await redirectAfterLogin(result.user.uid);
     } catch (err) {
       setError(err.message || "Login failed");
     } finally {
@@ -49,20 +55,21 @@ export default function LoginPage() {
 
   const handleGoogleLogin = async () => {
     setError("");
+    setLoading(true);
     try {
       const result = await signInWithGoogle();
-      let role = await getUserRole(result.user.uid);
-      localStorage.setItem("user", JSON.stringify({ ...result.user, role }));
-      redirectBasedOnRole(role);
+      await redirectAfterLogin(result.user.uid);
     } catch (err) {
       setError(err.message || "Google login failed");
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen w-full flex justify-center items-center bg-gradient-to-br from-pink-500 via-purple-500 to-indigo-500 p-4">
+    <div className="flex justify-center items-center min-h-screen bg-gradient-to-br from-pink-500 via-purple-500 to-indigo-500 p-4">
       <div className="bg-white/90 backdrop-blur-lg rounded-3xl shadow-2xl p-8 w-full max-w-md transform transition-all hover:scale-[1.02] duration-300">
-        <h1 className="text-4xl font-extrabold text-center text-transparent bg-clip-text bg-gradient-to-r from-indigo-500 to-pink-500 mb-8">
+        <h1 className="text-3xl font-bold text-center text-transparent bg-clip-text bg-gradient-to-r from-indigo-500 to-pink-500 mb-6">
           Welcome Back
         </h1>
 
@@ -97,20 +104,6 @@ export default function LoginPage() {
               required
               className="border border-gray-300 text-black rounded-xl p-3 w-full focus:ring-4 focus:ring-pink-300 outline-none"
             />
-          </div>
-
-          <div>
-            <label className="block text-gray-700 font-semibold mb-1">Role</label>
-            <select
-              name="role"
-              value={formData.role}
-              onChange={handleChange}
-              className="border border-gray-300 text-black rounded-xl p-3 w-full focus:ring-4 focus:ring-pink-300 outline-none"
-            >
-              <option value="">Select your role</option>
-              <option value="user">User</option>
-              <option value="organiser">Organiser</option>
-            </select>
           </div>
 
           <button

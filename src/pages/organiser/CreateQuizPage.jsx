@@ -1,4 +1,3 @@
-// src/pages/organiser/CreateQuizPage.jsx
 import { useState, useEffect } from "react";
 import { addDoc, collection, serverTimestamp, doc, getDoc } from "firebase/firestore";
 import { db, auth } from "../../firebase/firebaseConfig";
@@ -9,9 +8,15 @@ export default function CreateQuizPage() {
   const [guidelines, setGuidelines] = useState("");
   const [verified, setVerified] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [accessType, setAccessType] = useState("open");
+  const [linkCode, setLinkCode] = useState("");
+  const [generatedLink, setGeneratedLink] = useState(""); // for displaying final link
   const navigate = useNavigate();
 
-  // Fetch current user data to check verification
+  useEffect(() => {
+    fetchUserData();
+  }, []);
+
   const fetchUserData = async () => {
     try {
       if (!auth.currentUser) return;
@@ -27,29 +32,49 @@ export default function CreateQuizPage() {
     }
   };
 
-  useEffect(() => {
-    fetchUserData();
-  }, []);
+  // Generate random 6-character code
+  const generateCode = () => {
+    const code = Math.random().toString(36).substring(2, 8).toUpperCase();
+    setLinkCode(code);
+  };
 
   const handleCreate = async () => {
     if (!title.trim()) {
       alert("Quiz title is required!");
       return;
     }
-
     if (!verified) {
       alert("You are not verified to create quizzes!");
       return;
     }
 
     try {
-      const docRef = await addDoc(collection(db, "quizzes"), {
-        title: title.trim(),
-        guidelines: guidelines.trim(),
-        active: false,
-        createdAt: serverTimestamp(),
-        organiserId: auth.currentUser.uid, // store organiser ID
-      });
+      let docRef;
+      if (accessType === "open") {
+        docRef = await addDoc(collection(db, "quizzes"), {
+          title: title.trim(),
+          guidelines: guidelines.trim(),
+          active: false,
+          createdAt: serverTimestamp(),
+          organiserId: auth.currentUser.uid,
+        });
+      } else {
+        if (!linkCode.trim()) {
+          alert("Please provide a code or generate one!");
+          return;
+        }
+        docRef = await addDoc(collection(db, "quizzes_links"), {
+          title: title.trim(),
+          guidelines: guidelines.trim(),
+          active: false,
+          createdAt: serverTimestamp(),
+          organiserId: auth.currentUser.uid,
+          organiserName: auth.currentUser.displayName || "Anonymous",
+          linkCode: linkCode.trim(),
+        });
+        setGeneratedLink(`${window.location.origin}/quiz/${linkCode.trim()}`);
+      }
+
       navigate(`/organiser/add-question/${docRef.id}`);
     } catch (error) {
       console.error("Error creating quiz:", error);
@@ -64,7 +89,6 @@ export default function CreateQuizPage() {
       <div className="w-full max-w-lg bg-white rounded-lg shadow-lg p-8 border border-gray-200">
         <h1 className="text-2xl font-bold text-gray-800 mb-6">📝 Create New Quiz</h1>
 
-        {/* Quiz Title */}
         <label className="block text-sm font-medium text-gray-700 mb-1">Quiz Title</label>
         <input
           className="border border-gray-300 rounded-lg p-3 w-full mb-4 text-black focus:ring-2 focus:ring-blue-500 focus:outline-none"
@@ -73,16 +97,48 @@ export default function CreateQuizPage() {
           onChange={(e) => setTitle(e.target.value)}
         />
 
-        {/* Guidelines */}
         <label className="block text-sm font-medium text-gray-700 mb-1">Guidelines (optional)</label>
         <textarea
-          className="border border-gray-300 rounded-lg p-3 w-full mb-6 text-black h-28 resize-none focus:ring-2 focus:ring-blue-500 focus:outline-none"
+          className="border border-gray-300 rounded-lg p-3 w-full mb-4 text-black h-28 resize-none focus:ring-2 focus:ring-blue-500 focus:outline-none"
           placeholder="Add instructions or guidelines for participants..."
           value={guidelines}
           onChange={(e) => setGuidelines(e.target.value)}
         />
 
-        {/* Actions */}
+        <label className="block text-sm font-medium text-gray-700 mb-1">Quiz Access</label>
+        <select
+          value={accessType}
+          onChange={(e) => setAccessType(e.target.value)}
+          className="border border-gray-300 rounded-lg p-3 w-full mb-4 text-black focus:ring-2 focus:ring-blue-500 focus:outline-none"
+        >
+          <option value="open">Open to all</option>
+          <option value="link-only">Only via link</option>
+        </select>
+
+        {accessType === "link-only" && (
+          <div className="flex flex-col gap-2 mb-4">
+            <input
+              className="border border-gray-300 rounded-lg p-3 w-full text-black focus:ring-2 focus:ring-blue-500 focus:outline-none"
+              placeholder="Enter code or generate one..."
+              value={linkCode}
+              onChange={(e) => setLinkCode(e.target.value.toUpperCase())}
+            />
+            <button
+              onClick={generateCode}
+              type="button"
+              className="bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-lg transition w-full"
+            >
+              Generate Code
+            </button>
+          </div>
+        )}
+
+        {generatedLink && (
+          <p className="text-blue-600 text-sm mb-4">
+            Share this link: <a href={generatedLink} className="underline">{generatedLink}</a>
+          </p>
+        )}
+
         <div className="flex gap-3">
           <button
             onClick={() => navigate("/organiser/dashboard")}

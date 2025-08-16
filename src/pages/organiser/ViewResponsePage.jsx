@@ -15,19 +15,27 @@ export default function QuizReview() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Fetch quiz title
-        const quizRef = doc(db, "quizzes", quizId);
-        const quizSnap = await getDoc(quizRef);
-        if (quizSnap.exists()) {
-          setQuizTitle(quizSnap.data().title || "Quiz Review");
+        // Determine quiz collection
+        let collectionName = "quizzes";
+        let quizSnap = await getDoc(doc(db, "quizzes", quizId));
+        if (!quizSnap.exists()) {
+          quizSnap = await getDoc(doc(db, "quizzes_links", quizId));
+          if (!quizSnap.exists()) {
+            alert("Quiz data not found!");
+            return;
+          }
+          collectionName = "quizzes_links";
         }
 
+        // Fetch quiz title
+        setQuizTitle(quizSnap.data().title || "Quiz Review");
+
         // Fetch questions
-        const questionsRef = collection(db, `quizzes/${quizId}/questions`);
+        const questionsRef = collection(db, `${collectionName}/${quizId}/questions`);
         const questionsSnap = await getDocs(questionsRef);
-        const questionsData = questionsSnap.docs.map(doc => ({
+        const questionsData = questionsSnap.docs.map((doc) => ({
           id: doc.id,
-          ...doc.data()
+          ...doc.data(),
         }));
 
         // Fetch attempt data
@@ -63,8 +71,12 @@ export default function QuizReview() {
       <div className="bg-indigo-600 text-white rounded-lg p-4 shadow mb-6">
         <h1 className="text-2xl font-bold">{quizTitle}</h1>
         <div className="flex flex-wrap gap-4 mt-2 text-lg">
-          <p><span className="font-semibold">Score:</span> {score} / {questions.length}</p>
-          <p><span className="font-semibold">Time Taken:</span> {timeTaken}s</p>
+          <p>
+            <span className="font-semibold">Score:</span> {score} / {questions.reduce((sum, q) => sum + (q.points || 4), 0)}
+          </p>
+          <p>
+            <span className="font-semibold">Time Taken:</span> {timeTaken}s
+          </p>
         </div>
       </div>
 
@@ -87,8 +99,6 @@ export default function QuizReview() {
               <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {q.options.map((opt, i) => {
                   const isUserChoice = selectedAnswer === opt;
-                  const isRightAnswer = q.answer === opt;
-
                   let bg = "bg-gray-100";
                   let border = "border-gray-300";
 
@@ -98,9 +108,6 @@ export default function QuizReview() {
                   } else if (isUserChoice && !isCorrect) {
                     bg = "bg-red-200";
                     border = "border-red-500";
-                  } else if (!isUserChoice && isRightAnswer) {
-                    bg = "bg-green-100";
-                    border = "border-green-400";
                   }
 
                   return (
@@ -120,24 +127,23 @@ export default function QuizReview() {
                   <span className="font-semibold">Your Answer:</span>{" "}
                   {selectedAnswer || <em className="text-gray-500">No answer given</em>}
                 </p>
-                <p>
-                  <span className="font-semibold">Correct Answer:</span> {q.answer}
-                </p>
               </div>
             )}
 
             {/* Correct / Incorrect Tag */}
-            <div className="mt-3">
-              <span
-                className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${
-                  isCorrect
-                    ? "bg-green-100 text-green-700 border border-green-400"
-                    : "bg-red-100 text-red-700 border border-red-400"
-                }`}
-              >
-                {isCorrect ? "✅ Correct" : "❌ Incorrect"}
-              </span>
-            </div>
+            {selectedAnswer && (
+              <div className="mt-3">
+                <span
+                  className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${
+                    isCorrect
+                      ? "bg-green-100 text-green-700 border border-green-400"
+                      : "bg-red-100 text-red-700 border border-red-400"
+                  }`}
+                >
+                  {isCorrect ? "✅ Correct" : "❌ Incorrect"}
+                </span>
+              </div>
+            )}
           </div>
         );
       })}

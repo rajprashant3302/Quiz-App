@@ -1,8 +1,8 @@
 // src/pages/participant/QuizAttemptPage.jsx
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { getQuizWithQuestions } from "../../firebase/quizService";
-import { auth } from "../../firebase/firebaseConfig";
+import { getDoc, doc, collection, getDocs } from "firebase/firestore";
+import { db } from "../../firebase/firebaseConfig";
 
 export default function QuizAttemptPage() {
   const { quizId } = useParams();
@@ -13,25 +13,93 @@ export default function QuizAttemptPage() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const fetchQuiz = async () => {
-      const data = await getQuizWithQuestions(quizId);
-      setQuiz(data);
+    let cancelled = false;
+
+    const loadQuiz = async () => {
+      if (!quizId) {
+        setQuiz({ title: "Quiz not found", questions: [] });
+        return;
+      }
+
+      try {
+        // 1) Try quizzes_links/{quizId}/questions first (user came via share link)
+        const linkDocRef = doc(db, "quizzes_links", quizId);
+        const linkDocSnap = await getDoc(linkDocRef);
+
+        if (linkDocSnap.exists()) {
+          const linkQuestionsRef = collection(db, "quizzes_links", quizId, "questions");
+          const linkQuestionsSnap = await getDocs(linkQuestionsRef);
+          const linkQuestions = linkQuestionsSnap.docs.map((d) => ({
+            id: d.id,
+            ...d.data(),
+          }));
+
+          if (!cancelled && linkQuestions.length > 0) {
+            setQuiz({
+              id: linkDocSnap.id,
+              ...linkDocSnap.data(),
+              questions: linkQuestions,
+            });
+            return; // ✅ We found questions in quizzes_links — stop here
+          }
+          // If quizzes_links exists but has no questions, fall back below
+        }
+
+        // 2) Fallback: normal quizzes/{quizId}/questions
+        const quizDocRef = doc(db, "quizzes", quizId);
+        const quizDocSnap = await getDoc(quizDocRef);
+
+        if (quizDocSnap.exists()) {
+          const questionsRef = collection(db, "quizzes", quizId, "questions");
+          const questionsSnap = await getDocs(questionsRef);
+          const questions = questionsSnap.docs.map((d) => ({
+            id: d.id,
+            ...d.data(),
+          }));
+
+          if (!cancelled) {
+            setQuiz({
+              id: quizDocSnap.id,
+              ...quizDocSnap.data(),
+              questions,
+            });
+          }
+        } else {
+          if (!cancelled) {
+            setQuiz({ title: "Quiz not found", questions: [] });
+          }
+        }
+      } catch (e) {
+        console.error("Error loading quiz:", e);
+        if (!cancelled) setQuiz({ title: "Error loading quiz", questions: [] });
+      }
     };
-    fetchQuiz();
+
+    loadQuiz();
+    return () => {
+      cancelled = true;
+    };
   }, [quizId]);
 
   useEffect(() => {
     if (!quiz) return;
-    const timer = setInterval(() => {
-      setTimeElapsed((prev) => prev + 1);
-    }, 1000);
-    return () => clearInterval(timer);
+    const t = setInterval(() => setTimeElapsed((prev) => prev + 1), 1000);
+    return () => clearInterval(t);
   }, [quiz]);
 
   if (!quiz) {
     return (
       <div className="flex justify-center items-center min-h-screen text-lg text-gray-600">
         Loading...
+      </div>
+    );
+  }
+
+  if (!quiz.questions || quiz.questions.length === 0) {
+    return (
+      <div className="flex flex-col justify-center items-center min-h-screen text-lg text-gray-600">
+        <h1 className="text-2xl font-bold mb-4">{quiz.title}</h1>
+        <p>No questions available for this quiz.</p>
       </div>
     );
   }
@@ -73,7 +141,7 @@ export default function QuizAttemptPage() {
 
           {currentQuestion.type === "MCQ" ? (
             <div className="space-y-3">
-              {currentQuestion.options.map((opt) => (
+              {currentQuestion.options?.map((opt) => (
                 <label
                   key={opt}
                   className={`flex items-center p-3 border rounded-lg cursor-pointer transition ${

@@ -4,7 +4,7 @@ import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { db } from "../../firebase/firebaseConfig";
 
 export default function EditQuestionPage() {
-  const { quizId, questionId } = useParams();
+  const { quizId, questionId, source = "quizzes" } = useParams(); // Default to 'quizzes'
   const navigate = useNavigate();
 
   const [questionData, setQuestionData] = useState({
@@ -18,7 +18,7 @@ export default function EditQuestionPage() {
 
   const fetchQuestion = async () => {
     try {
-      const docRef = doc(db, "quizzes", quizId, "questions", questionId);
+      const docRef = doc(db, source, quizId, "questions", questionId);
       const snapshot = await getDoc(docRef);
       if (snapshot.exists()) {
         const data = snapshot.data();
@@ -40,7 +40,7 @@ export default function EditQuestionPage() {
 
   useEffect(() => {
     fetchQuestion();
-  }, [quizId, questionId]);
+  }, [quizId, questionId, source]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -55,7 +55,7 @@ export default function EditQuestionPage() {
 
   const handleSave = async () => {
     try {
-      const docRef = doc(db, "quizzes", quizId, "questions", questionId);
+      const docRef = doc(db, source, quizId, "questions", questionId);
       const updateData = {
         question: questionData.question,
         type: questionData.type,
@@ -66,7 +66,7 @@ export default function EditQuestionPage() {
       }
       await updateDoc(docRef, updateData);
       alert("Question updated successfully!");
-      navigate(`/organiser/questions/${quizId}`);
+      navigate(`/organiser/questions/${quizId}?source=${source}`);
     } catch (error) {
       console.error("Error updating question:", error);
     }
@@ -140,7 +140,7 @@ export default function EditQuestionPage() {
         {/* Action buttons */}
         <div className="flex gap-3">
           <button
-            onClick={() => navigate(`/organiser/questions/${quizId}`)}
+            onClick={() => navigate(`/organiser/questions/${quizId}?source=${source}`)}
             className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-3 rounded-lg transition"
           >
             Cancel

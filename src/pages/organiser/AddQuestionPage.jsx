@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { doc, collection, addDoc, getDocs, deleteDoc } from "firebase/firestore";
+import { doc, collection, addDoc, getDocs, deleteDoc, getDoc } from "firebase/firestore";
 import { db } from "../../firebase/firebaseConfig";
 import { useParams, useNavigate } from "react-router-dom";
 
@@ -11,15 +11,40 @@ export default function QuestionsPage() {
   const [question, setQuestion] = useState("");
   const [options, setOptions] = useState(["", "", "", ""]);
   const [answer, setAnswer] = useState("");
+  const [isLinkQuiz, setIsLinkQuiz] = useState(false); // new state to track quiz type
+  const [quizData, setQuizData] = useState(null);
 
-  const fetchQuestions = async () => {
-    const qSnap = await getDocs(collection(db, "quizzes", quizId, "questions"));
+  // Determine if quiz is open or link-only
+  const fetchQuizData = async () => {
+    let quizRef = doc(db, "quizzes", quizId);
+    let snap = await getDoc(quizRef);
+
+    if (!snap.exists()) {
+      // check link-only collection
+      quizRef = doc(db, "quizzes_links", quizId);
+      snap = await getDoc(quizRef);
+      if (snap.exists()) {
+        setIsLinkQuiz(true);
+        setQuizData(snap.data());
+      } else {
+        alert("Quiz not found!");
+        navigate("/organiser/dashboard");
+        return;
+      }
+    } else {
+      setQuizData(snap.data());
+    }
+
+    // fetch existing questions
+    const qSnap = await getDocs(collection(db, isLinkQuiz ? "quizzes_links" : "quizzes", quizId, "questions"));
     setQuestions(qSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })).reverse());
   };
 
   const addQuestion = async () => {
     if (!question.trim() || !answer.trim()) return alert("Please fill all fields!");
-    await addDoc(collection(db, "quizzes", quizId, "questions"), {
+    const collectionName = isLinkQuiz ? "quizzes_links" : "quizzes";
+
+    await addDoc(collection(db, collectionName, quizId, "questions"), {
       question,
       type,
       options: type === "MCQ" ? options : [],
@@ -28,17 +53,18 @@ export default function QuestionsPage() {
     setQuestion("");
     setOptions(["", "", "", ""]);
     setAnswer("");
-    fetchQuestions();
+    fetchQuizData();
   };
 
   const removeQuestion = async (qid) => {
     if (!window.confirm("Are you sure you want to delete this question?")) return;
-    await deleteDoc(doc(db, "quizzes", quizId, "questions", qid));
-    fetchQuestions();
+    const collectionName = isLinkQuiz ? "quizzes_links" : "quizzes";
+    await deleteDoc(doc(db, collectionName, quizId, "questions", qid));
+    fetchQuizData();
   };
 
   useEffect(() => {
-    fetchQuestions();
+    fetchQuizData();
   }, []);
 
   return (

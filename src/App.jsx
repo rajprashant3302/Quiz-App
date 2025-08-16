@@ -53,9 +53,10 @@ function App() {
         element={<PrivateRoute allowedRole="organiser"><QuestionPage /></PrivateRoute>}
       />
       <Route
-        path="/organiser/questions/:quizId/:questionId"
+        path="/organiser/edit-question/:source/:quizId/:questionId"
         element={<PrivateRoute allowedRole="organiser"><EditQuestionPage /></PrivateRoute>}
       />
+
       <Route
         path="organiser/quiz/:quizId/user/:userId/answers"
         element={<PrivateRoute allowedRole="organiser"><ViewResponsesPage /></PrivateRoute>}

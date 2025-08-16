@@ -1,16 +1,34 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { collection, getDocs, deleteDoc, doc } from "firebase/firestore";
+import { collection, getDocs, deleteDoc, doc, getDoc } from "firebase/firestore";
 import { db } from "../../firebase/firebaseConfig";
 
 export default function QuestionsListPage() {
   const { quizId } = useParams();
   const navigate = useNavigate();
   const [questions, setQuestions] = useState([]);
+  const [quizCollection, setQuizCollection] = useState("quizzes"); // track which collection
 
   const fetchQuestions = async () => {
     try {
-      const snapshot = await getDocs(collection(db, "quizzes", quizId, "questions"));
+      // Check if quiz exists in "quizzes" collection
+      const quizSnap = await getDoc(doc(db, "quizzes", quizId));
+      let collectionName = "quizzes";
+      if (!quizSnap.exists()) {
+        // If not, check "quizzes_links"
+        const linkSnap = await getDoc(doc(db, "quizzes_links", quizId));
+        if (!linkSnap.exists()) {
+          alert("Quiz not found!");
+          navigate("/organiser/dashboard");
+          return;
+        }
+        collectionName = "quizzes_links";
+      }
+
+      setQuizCollection(collectionName);
+
+      // Fetch questions from the correct collection
+      const snapshot = await getDocs(collection(db, collectionName, quizId, "questions"));
       setQuestions(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
     } catch (error) {
       console.error("Error fetching questions:", error);
@@ -20,7 +38,7 @@ export default function QuestionsListPage() {
   const handleDelete = async (questionId) => {
     if (!window.confirm("Are you sure you want to delete this question?")) return;
     try {
-      await deleteDoc(doc(db, "quizzes", quizId, "questions", questionId));
+      await deleteDoc(doc(db, quizCollection, quizId, "questions", questionId));
       fetchQuestions();
     } catch (error) {
       console.error("Error deleting question:", error);

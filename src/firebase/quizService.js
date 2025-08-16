@@ -99,3 +99,29 @@ export const submitQuiz = async (quizId, uid, answers, timeTaken) => {
     submittedAt: new Date()
   });
 };
+
+export async function getQuizFromLink(quizId) {
+  try {
+    const quizRef = doc(db, "quizzes_links", quizId);
+    const quizSnap = await getDoc(quizRef);
+
+    if (!quizSnap.exists()) {
+      throw new Error("Quiz not found");
+    }
+
+    // Get questions from the quizzes_links/{quizId}/questions subcollection
+    const questionsSnap = await getDocs(
+      collection(db, "quizzes_links", quizId, "questions")
+    );
+
+    const questions = questionsSnap.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+
+    return { id: quizSnap.id, ...quizSnap.data(), questions };
+  } catch (err) {
+    console.error("Error fetching quiz from link:", err);
+    throw err;
+  }
+}
