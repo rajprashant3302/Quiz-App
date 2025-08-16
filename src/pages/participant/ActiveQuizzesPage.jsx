@@ -24,7 +24,6 @@ export default function ActiveQuizzesPage() {
           if (userData.verified) {
             setVerificationStatus("Verified ✅");
           } else {
-            // Check if pending verification request
             const reqQuery = query(
               collection(db, "verificationRequests"),
               where("userId", "==", uid)
@@ -40,20 +39,43 @@ export default function ActiveQuizzesPage() {
 
     const fetchQuizzes = async () => {
       try {
-        const q = query(collection(db, "quizzes"), where("active", "==", true));
-        const snapshot = await getDocs(q);
-        const quizzesData = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-        setQuizzes(quizzesData);
+        // 1️⃣ Fetch active quizzes
+        const activeQuery = query(collection(db, "quizzes"), where("active", "==", true));
+        const activeSnap = await getDocs(activeQuery);
+        const activeQuizzes = activeSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-        const attempts = {};
-        for (let quiz of quizzesData) {
-          const attemptRef = doc(db, "quizAttempts", `${quiz.id}_${uid}`);
-          const attemptSnap = await getDoc(attemptRef);
-          if (attemptSnap.exists()) {
-            attempts[quiz.id] = true;
+        // 2️⃣ Fetch all quizAttempts
+        const attemptsSnap = await getDocs(collection(db, "quizAttempts"));
+        const attemptsMap = {};
+        const extraQuizzes = [];
+
+        for (let docSnap of attemptsSnap.docs) {
+          const data = docSnap.data();
+          if (docSnap.id.endsWith(`_${uid}`) && data.quizId) {
+            attemptsMap[data.quizId] = true;
+
+            // If quiz not in activeQuizzes, try fetching title from quizzes_links
+            if (!activeQuizzes.some(q => q.id === data.quizId)) {
+              const linkDocRef = doc(db, "quizzes_links", data.quizId);
+              const linkDocSnap = await getDoc(linkDocRef);
+
+              if (linkDocSnap.exists()) {
+                const linkData = linkDocSnap.data();
+                extraQuizzes.push({
+                  id: data.quizId,
+                  title: linkData.title || "Untitled Quiz",
+                  guidelines: linkData.guidelines || "",
+                });
+              }
+            }
           }
         }
-        setAttemptedQuizzes(attempts);
+
+        // 3️⃣ Merge active quizzes + attempted private quizzes
+        const mergedQuizzes = [...activeQuizzes, ...extraQuizzes];
+
+        setQuizzes(mergedQuizzes);
+        setAttemptedQuizzes(attemptsMap);
       } catch (err) {
         console.error("Error fetching quizzes:", err);
       }

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { doc, getDoc, updateDoc, setDoc, deleteDoc } from "firebase/firestore";
 import { db } from "../../firebase/firebaseConfig";
 import { useNavigate, useParams } from "react-router-dom";
 
@@ -7,7 +7,10 @@ export default function EditQuizPage() {
   const { quizId } = useParams();
   const [title, setTitle] = useState("");
   const [guidelines, setGuidelines] = useState("");
+  const [accessType, setAccessType] = useState("open"); // default open
+  const [linkCode, setLinkCode] = useState("");
   const [loading, setLoading] = useState(true);
+  const [originalCollection, setOriginalCollection] = useState("quizzes"); // track where quiz is
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -18,6 +21,22 @@ export default function EditQuizPage() {
           const data = snap.data();
           setTitle(data.title || "");
           setGuidelines(data.guidelines || "");
+          setAccessType("open");
+          setLinkCode("");
+          setOriginalCollection("quizzes");
+        } else {
+          const linkSnap = await getDoc(doc(db, "quizzes_links", quizId));
+          if (linkSnap.exists()) {
+            const data = linkSnap.data();
+            setTitle(data.title || "");
+            setGuidelines(data.guidelines || "");
+            setAccessType("link-only");
+            setLinkCode(data.linkCode || "");
+            setOriginalCollection("quizzes_links");
+          } else {
+            alert("Quiz not found!");
+            navigate("/organiser/dashboard");
+          }
         }
       } catch (error) {
         console.error("Error fetching quiz:", error);
@@ -26,19 +45,37 @@ export default function EditQuizPage() {
       }
     };
     fetchQuiz();
-  }, [quizId]);
+  }, [quizId, navigate]);
 
   const handleUpdate = async () => {
     if (!title.trim()) {
       alert("Quiz title is required!");
       return;
     }
+
     try {
-      await updateDoc(doc(db, "quizzes", quizId), { title, guidelines });
+      const targetCollection = accessType === "open" ? "quizzes" : "quizzes_links";
+
+      const updatedData = {
+        title,
+        guidelines,
+        accessType,
+        linkCode: accessType === "link-only" ? linkCode.toUpperCase() : "",
+      };
+
+      if (originalCollection === targetCollection) {
+        await updateDoc(doc(db, targetCollection, quizId), updatedData);
+      } else {
+        await setDoc(doc(db, targetCollection, quizId), updatedData);
+        await deleteDoc(doc(db, originalCollection, quizId));
+        setOriginalCollection(targetCollection);
+      }
+
       alert("Quiz updated successfully!");
       navigate("/organiser/dashboard");
     } catch (error) {
       console.error("Error updating quiz:", error);
+      alert("Failed to update quiz!");
     }
   };
 
@@ -72,10 +109,29 @@ export default function EditQuizPage() {
           onChange={(e) => setGuidelines(e.target.value)}
           placeholder="Enter quiz guidelines..."
           rows={4}
-          className="w-full border border-gray-300 rounded-lg p-3 text-black focus:ring-2 focus:ring-blue-500 focus:outline-none mb-6"
+          className="w-full border border-gray-300 rounded-lg p-3 text-black focus:ring-2 focus:ring-blue-500 focus:outline-none mb-4"
         />
 
-        {/* Buttons */}
+        {/* Access Type - Read Only */}
+        <label className="block text-sm font-medium text-gray-700 mb-1">Quiz Access</label>
+        <input
+          type="text"
+          value={accessType === "open" ? "Open to all" : "Only via link"}
+          readOnly
+          className="w-full border border-gray-300 rounded-lg p-3 text-black bg-gray-100 cursor-not-allowed mb-4"
+        />
+
+        {accessType === "link-only" && (
+          <div className="flex flex-col gap-2 mb-4">
+            <input
+              type="text"
+              value={linkCode}
+              readOnly
+              className="border border-gray-300 rounded-lg p-3 w-full text-black bg-gray-100 cursor-not-allowed"
+            />
+          </div>
+        )}
+
         <div className="flex gap-3">
           <button
             onClick={() => navigate("/organiser/dashboard")}

@@ -20,7 +20,6 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
-  // Fetch current user
   const fetchUserData = async () => {
     try {
       if (!auth.currentUser) return;
@@ -34,43 +33,63 @@ export default function DashboardPage() {
     }
   };
 
-  // Fetch organiser's quizzes only
   const fetchQuizzes = async () => {
     try {
       if (!auth.currentUser) return;
-      const q = query(
+
+      // Fetch from "quizzes" (Public)
+      const q1 = query(
         collection(db, "quizzes"),
         where("organiserId", "==", auth.currentUser.uid)
       );
-      const snapshot = await getDocs(q);
-      setQuizzes(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
+      const snapshot1 = await getDocs(q1);
+      const publicQuizzes = snapshot1.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+        type: "public",
+        source: "quizzes",
+      }));
+
+      // Fetch from "quizzes_links" (Private)
+      const q2 = query(
+        collection(db, "quizzes_links"),
+        where("organiserId", "==", auth.currentUser.uid)
+      );
+      const snapshot2 = await getDocs(q2);
+      const privateQuizzes = snapshot2.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+        type: "private",
+        source: "quizzes_links",
+      }));
+
+      setQuizzes([...publicQuizzes, ...privateQuizzes]);
     } catch (err) {
       console.error(err);
     }
   };
 
-  const toggleActive = async (id, active) => {
+  const toggleActive = async (id, active, source) => {
     if (!userData?.verified) return;
     try {
-      await updateDoc(doc(db, "quizzes", id), { active: !active });
+      await updateDoc(doc(db, source, id), { active: !active });
       fetchQuizzes();
     } catch (err) {
       console.error(err);
     }
   };
 
-  const deleteQuiz = async (id) => {
+  const deleteQuiz = async (id, source) => {
     if (!userData?.verified) return;
     if (!window.confirm("Are you sure you want to delete this quiz?")) return;
     try {
-      await deleteDoc(doc(db, "quizzes", id));
+      await deleteDoc(doc(db, source, id));
       fetchQuizzes();
     } catch (err) {
       console.error(err);
     }
   };
 
-  // Request verification
   const requestVerification = async () => {
     try {
       const requestsRef = collection(db, "verificationRequests");
@@ -119,11 +138,10 @@ export default function DashboardPage() {
           <button
             onClick={() => navigate("/organiser/create-quiz")}
             disabled={!userData?.verified}
-            className={`px-4 py-2 font-medium rounded-lg transition ${
-              userData?.verified
+            className={`px-4 py-2 font-medium rounded-lg transition ${userData?.verified
                 ? "bg-blue-600 hover:bg-blue-700 text-white"
                 : "bg-gray-300 text-gray-500 cursor-not-allowed"
-            }`}
+              }`}
           >
             ➕ Create Quiz
           </button>
@@ -147,6 +165,7 @@ export default function DashboardPage() {
             <thead>
               <tr className="bg-indigo-600 text-white">
                 <th className="p-3 text-left">Title</th>
+                <th className="p-3 text-left">Type</th>
                 <th className="p-3 text-left">Active</th>
                 <th className="p-3 text-left">Actions</th>
               </tr>
@@ -154,15 +173,25 @@ export default function DashboardPage() {
             <tbody>
               {quizzes.map((quiz, idx) => (
                 <tr
-                  key={quiz.id}
+                  key={`${quiz.source}-${quiz.id}`}
                   className={`border-t ${idx % 2 === 0 ? "bg-gray-50" : "bg-white"} hover:bg-indigo-50 transition`}
                 >
                   <td className="p-3 font-medium text-gray-800">{quiz.title}</td>
                   <td className="p-3">
                     <span
-                      className={`px-2 py-1 rounded-full text-xs sm:text-sm font-semibold ${
-                        quiz.active ? "bg-green-100 text-green-700" : "bg-gray-200 text-gray-700"
-                      }`}
+                      className={`px-2 py-1 rounded-full text-xs sm:text-sm font-semibold ${quiz.type === "public"
+                          ? "bg-green-100 text-green-700"
+                          : "bg-gray-200 text-gray-700"
+                        }`}
+                      title={quiz.type === "public" ? "Open to all (Public Quiz)" : "Private Quiz"}
+                    >
+                      {quiz.type === "public" ? "Public" : "Private"}
+                    </span>
+                  </td>
+                  <td className="p-3">
+                    <span
+                      className={`px-2 py-1 rounded-full text-xs sm:text-sm font-semibold ${quiz.active ? "bg-green-100 text-green-700" : "bg-gray-200 text-gray-700"
+                        }`}
                     >
                       {quiz.active ? "Yes" : "No"}
                     </span>
@@ -171,11 +200,10 @@ export default function DashboardPage() {
                     <button
                       onClick={() => navigate(`/organiser/edit-quiz/${quiz.id}`)}
                       disabled={!userData?.verified}
-                      className={`px-2 py-1 rounded text-xs sm:text-sm ${
-                        userData?.verified
+                      className={`px-2 py-1 rounded text-xs sm:text-sm ${userData?.verified
                           ? "bg-yellow-500 hover:bg-yellow-600 text-white"
                           : "bg-gray-300 text-gray-500 cursor-not-allowed"
-                      }`}
+                        }`}
                     >
                       ✏ Edit
                     </button>
@@ -186,29 +214,27 @@ export default function DashboardPage() {
                     >
                       ❓ Questions
                     </button>
-
                     <button
-                      onClick={() => toggleActive(quiz.id, quiz.active)}
-                      disabled={!userData?.verified}
-                      className={`px-2 py-1 text-white rounded text-xs sm:text-sm ${
-                        userData?.verified
-                          ? quiz.active
-                            ? "bg-green-600 hover:bg-green-700"
-                            : "bg-gray-600 hover:bg-gray-700"
-                          : "bg-gray-300 text-gray-500 cursor-not-allowed"
-                      }`}
+                      onClick={() => toggleActive(quiz.id, quiz.active, quiz.source)}
+                      disabled={!userData?.verified || quiz.type === "private"} // <-- disable for private
+                      className={`px-2 py-1 text-white rounded text-xs sm:text-sm ${!userData?.verified || quiz.type === "private"
+                          ? "bg-teal-400 text-green-900 cursor-not-allowed"
+                          : quiz.active
+                            ?  "bg-red-600 hover:bg-red-700"
+                            :"bg-green-600 hover:bg-green-700"
+                        }`}
                     >
                       {quiz.active ? "Deactivate" : "Activate"}
                     </button>
 
+
                     <button
-                      onClick={() => deleteQuiz(quiz.id)}
+                      onClick={() => deleteQuiz(quiz.id, quiz.source)}
                       disabled={!userData?.verified}
-                      className={`px-2 py-1 rounded text-xs sm:text-sm ${
-                        userData?.verified
-                          ? "bg-red-600 hover:bg-red-700 text-white"
+                      className={`px-2 py-1 rounded text-xs sm:text-sm ${userData?.verified ?
+                          "bg-red-600 hover:bg-red-700 text-white"
                           : "bg-gray-300 text-gray-500 cursor-not-allowed"
-                      }`}
+                        }`}
                     >
                       🗑 Delete
                     </button>

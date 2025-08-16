@@ -1,38 +1,51 @@
-// src/pages/participant/LeaderboardPage.jsx
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { collection, getDocs, query, where, doc, getDoc } from "firebase/firestore";
 import { db } from "../../firebase/firebaseConfig";
 
 export default function LeaderboardPage() {
-  const { quizId } = useParams();
+  const { quizId: paramQuizId } = useParams();
+  const [quizId, setQuizId] = useState(null);
   const [leaders, setLeaders] = useState([]);
 
   useEffect(() => {
+    const storedId = sessionStorage.getItem("quizId");
+    setQuizId(paramQuizId || storedId);
+  }, [paramQuizId]);
+
+  useEffect(() => {
+    if (!quizId) return;
+
     const fetchLeaders = async () => {
-      const attemptsRef = collection(db, "quizAttempts");
-      const q = query(attemptsRef, where("quizId", "==", quizId));
-      const snapshot = await getDocs(q);
-      const attemptsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      try {
+        const attemptsRef = collection(db, "quizAttempts");
+        const q = query(attemptsRef, where("quizId", "==", quizId));
+        const snapshot = await getDocs(q);
+        const attemptsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-      const attemptsWithEmail = await Promise.all(
-        attemptsData.map(async attempt => {
-          try {
-            const userDoc = await getDoc(doc(db, "users", attempt.uid));
-            const email = userDoc.exists() ? userDoc.data().email : attempt.uid;
-            return { ...attempt, email };
-          } catch {
-            return { ...attempt, email: attempt.uid };
-          }
-        })
-      );
+        const attemptsWithEmail = await Promise.all(
+          attemptsData.map(async attempt => {
+            try {
+              const userDoc = await getDoc(doc(db, "users", attempt.uid));
+              const email = userDoc.exists()
+                ? userDoc.data().email
+                : "Guest User";
+              return { ...attempt, email };
+            } catch {
+              return { ...attempt, email: "Guest User" };
+            }
+          })
+        );
 
-      attemptsWithEmail.sort((a, b) => {
-        if (b.score !== a.score) return b.score - a.score;
-        return a.timeTaken - b.timeTaken;
-      });
+        attemptsWithEmail.sort((a, b) => {
+          if (b.score !== a.score) return b.score - a.score;
+          return a.timeTaken - b.timeTaken;
+        });
 
-      setLeaders(attemptsWithEmail);
+        setLeaders(attemptsWithEmail);
+      } catch (error) {
+        console.error("Error fetching leaderboard:", error);
+      }
     };
 
     fetchLeaders();
@@ -53,7 +66,7 @@ export default function LeaderboardPage() {
               <thead>
                 <tr className="bg-indigo-600 text-white text-left">
                   <th className="p-2 sm:p-3">Rank</th>
-                  <th className="p-2 sm:p-3">Email</th>
+                  <th className="p-2 sm:p-3">User</th>
                   <th className="p-2 sm:p-3">Score</th>
                   <th className="p-2 sm:p-3">Time (sec)</th>
                 </tr>
